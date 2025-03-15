@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enrutador</title>
+    <!-- Importación de librerías -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.2.0/tf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow-models/coco-ssd/2.2.2/coco-ssd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.5/opencv.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.1/tesseract.min.js"></script>
+    <!-- Estilos CSS -->
+    <style>
+        /* Variables y reset */
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2980b9;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            color: var(--dark-color);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .app-title {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .nav-buttons {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            gap: 1rem;
+        }
+
+        /* Main Content */
+        main {
+            max-width: 1200px;
+            margin: 1rem auto;
+            padding: 0 1rem;
+            min-height: calc(100vh - 160px);
+        }
+
+        /* Footer */
+        footer {
+            background-color: var(--dark-color);
+            color: var(--light-color);
+            text-align: center;
+            padding: 1rem;
+            margin-top: 2rem;
+        }
+
+        /* Buttons */
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-weight: bold;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+        }
+
+        button:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.accent {
+            background-color: var(--accent-color);
+        }
+
+        button.accent:hover {
+            background-color: #c0392b;
+        }
+
+        button.back {
+            display: flex;
+            align-items: center;
+            background-color: transparent;
+            color: var(--dark-color);
+            box-shadow: none;
+            padding: 0.5rem;
+        }
+
+        button.back:hover {
+            color: var(--primary-color);
+            background-color: transparent;
+        }
+
+        /* Lists */
+        .list-container {
+            margin-top: 2rem;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            background-color: white;
+        }
+
+        .list-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.75rem 1rem;
+            font-weight: bold;
+        }
+
+        .list-item {
+            padding: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .list-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2rem;
+            box-shadow: var(--shadow);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+
+        th {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: left;
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+            background-color: white;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            width: 90%;
+            max-width: 500px;
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-title {
+            margin-bottom: 1.5rem;
+            color: var(--dark-color);
+            font-size: 1.5rem;
+        }
+
+        .modal-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        /* Form Controls */
+        input[type="text"] {
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
+        }
+
+        /* Views */
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        /* Camera View */
+        .camera-container {
+            position: relative;
+            max-width: 100%;
+            margin: 0 auto;
+            overflow: hidden;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            max-height: 70vh;
+            background-color: #000;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .error-message {
+            color: var(--accent-color);
+            background-color: #fadbd8;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin: 1rem 0;
+            text-align: center;
+        }
+
+        .codes-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1rem;
+        }
+
+        .codes-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .folder-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .folder-title {
+            font-size: 1.5rem;
+            margin-left: 1rem;
+        }
+
+        .back-button-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin-right: 1rem;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+
+        .delete-mode {
+            background-color: #fadbd8;
+            border: 2px dashed var(--accent-color);
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+        }
+
+        /* Responsive Design */
+        @media screen and (min-width: 768px) {
+            .header-container {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+
+            .app-title {
+                margin-bottom: 0;
+            }
+
+            .nav-buttons {
+                justify-content: flex-end;
+                width: auto;
+            }
+        }
+
+        @media screen and (max-width: 767px) {
+            button {
+                padding: 0.6rem 1.2rem;
+                font-size: 0.9rem;
+            }
+
+            .app-title {
+                font-size: 1.5rem;
+            }
+
+            th, td {
+                padding: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <h1 class="app-title">Enrutador</h1>
+            <div class="nav-buttons">
+                <button id="folders-btn">CARPETAS</button>
+                <button id="camera-btn">LECTURA DE CÓDIGOS</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Vista de carpetas -->
+        <div id="folders-view" class="view active">
+            <div class="folder-header">
+                <h2>Carpetas</h2>
+                <div class="codes-buttons">
+                    <button id="add-folder-btn">AGREGAR CARPETA</button>
+                    <button id="delete-folder-btn" class="accent">ELIMINAR CARPETA</button>
+                </div>
+            </div>
+            <div id="delete-folder-mode" class="delete-mode" style="display: none;">
+                <p>Seleccione las carpetas a eliminar y presione "Confirmar"</p>
+                <button id="confirm-delete-folders" class="accent">Confirmar</button>
+                <button id="cancel-delete-folders">Cancelar</button>
+            </div>
+            <div id="folders-list" class="list-container">
+                <!-- Las carpetas se agregarán dinámicamente aquí -->
+                <div class="list-header">Carpetas</div>
+                <div id="no-folders-message" class="list-item">No hay carpetas agregadas</div>
+            </div>
+        </div>
+
+        <!-- Vista de códigos dentro de una carpeta -->
+        <div id="codes-view" class="view">
+            <div class="folder-header">
+                <div class="back-button-container">
+                    <button id="back-to-folders" class="back">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <h2 id="folder-name" class="folder-title">Nombre de la carpeta</h2>
+                </div>
+                <div class="codes-buttons">
+                    <button id="add-code-btn">AGREGAR CÓDIGO</button>
+                    <button id="delete-code-btn" class="accent">ELIMINAR CÓDIGO</button>
+                </div>
+            </div>
+            <div id="delete-code-mode" class="delete-mode" style="display: none;">
+                <p>Seleccione los códigos a eliminar y presione "Confirmar"</p>
+                <button id="confirm-delete-codes" class="accent">Confirmar</button>
+                <button id="cancel-delete-codes">Cancelar</button>
+            </div>
+            <table id="codes-table">
+                <thead>
+                    <tr>
+                        <th>CÓDIGOS</th>
+                        <th>RUTA</th>
+                    </tr>
+                </thead>
+                <tbody id="codes-list">
+                    <!-- Los códigos se agregarán dinámicamente aquí -->
+                    <tr id="no-codes-row">
+                        <td colspan="2">No hay códigos agregados</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Vista de la cámara para lectura de códigos -->
+        <div id="camera-view" class="view">
+            <div class="folder-header">
+                <div class="back-button-container">
+                    <button id="back-to-main" class="back">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <h2 class="folder-title">Lectura de Códigos</h2>
+                </div>
+            </div>
+            <div class="camera-container">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas"></canvas>
+            </div>
+            <div id="camera-error" class="error-message" style="display: none;">
+                Error al acceder a la cámara. Por favor, verifica los permisos.
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>© 2025 Aplicación Enrutador | Todos los derechos reservados</p>
+        <p>Contacto: soporte@enrutador.com</p>
+    </footer>
+
+    <!-- Modales -->
+    <div id="add-folder-modal" class="modal">
+        <div class="modal-content">
+            <h3 class="modal-title">Agregar Carpeta</h3>
+            <form id="add-folder-form" class="modal-form">
+                <input type="text" id="folder-input" placeholder="Nombre de la carpeta" required>
+                <div class="modal-buttons">
+                    <button type="button" id="cancel-add-folder">Cancelar</button>
+                    <button type="submit">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="add-code-modal" class="modal">
+        <div class="modal-content">
+            <h3 class="modal-title">Agregar Código</h3>
+            <form id="add-code-form" class="modal-form">
+                <input type="text" id="code-input" placeholder="Código" required>
+                <input type="text" id="route-input" placeholder="Ruta (letra)" required maxlength="1">
+                <div class="modal-buttons">
+                    <button type="button" id="cancel-add-code">Cancelar</button>
+                    <button type="submit">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // Estructura de datos para almacenar carpetas y códigos
+        let foldersData = JSON.parse(localStorage.getItem('enrutadorFolders')) || [];
+        let currentFolder = null;
+        let deleteMode = false;
+
+        // Referencias a elementos del DOM
+        const foldersView = document.getElementById('folders-view');
+        const codesView = document.getElementById('codes-view');
+        const cameraView = document.getElementById('camera-view');
+        const foldersList = document.getElementById('folders-list');
+        const noFoldersMessage = document.getElementById('no-folders-message');
+        const codesList = document.getElementById('codes-list');
+        const noCodesRow = document.getElementById('no-codes-row');
+        const folderNameElement = document.getElementById('folder-name');
+        const addFolderModal = document.getElementById('add-folder-modal');
+        const addCodeModal = document.getElementById('add-code-modal');
+        const addFolderForm = document.getElementById('add-folder-form');
+        const addCodeForm = document.getElementById('add-code-form');
+        const folderInput = document.getElementById('folder-input');
+        const codeInput = document.getElementById('code-input');
+        const routeInput = document.getElementById('route-input');
+        const deleteFolderMode = document.getElementById('delete-folder-mode');
+        const deleteCodeMode = document.getElementById('delete-code-mode');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const cameraError = document.getElementById('camera-error');
+
+        // Botones
+        const foldersBtn = document.getElementById('folders-btn');
+        const cameraBtn = document.getElementById('camera-btn');
+        const addFolderBtn = document.getElementById('add-folder-btn');
+        const deleteFolderBtn = document.getElementById('delete-folder-btn');
+        const backToFoldersBtn = document.getElementById('back-to-folders');
+        const addCodeBtn = document.getElementById('add-code-btn');
+        const deleteCodeBtn = document.getElementById('delete-code-btn');
+        const backToMainBtn = document.getElementById('back-to-main');
+        const cancelAddFolderBtn = document.getElementById('cancel-add-folder');
+        const cancelAddCodeBtn = document.getElementById('cancel-add-code');
+        const confirmDeleteFoldersBtn = document.getElementById('confirm-delete-folders');
+        const cancelDeleteFoldersBtn = document.getElementById('cancel-delete-folders');
+        const confirmDeleteCodesBtn = document.getElementById('confirm-delete-codes');
+        const cancelDeleteCodesBtn = document.getElementById('cancel-delete-codes');
+
+        // Variables para la cámara y detección
+        let videoStream = null;
+        let cocoModel = null;
+        let recognizedCodes = new Set();
+        let cameraActive = false;
+        let lastDetectionTime = 0;
+        const detectionInterval = 1000 / 40; // 40 FPS
+
+        // Función para guardar datos en el almacenamiento local
+        function saveData() {
+            localStorage.setItem('enrutadorFolders', JSON.stringify(foldersData));
+        }
+
+        // Función para cambiar entre vistas
+        function showView(view) {
+            foldersView.classList.remove('active');
+            codesView.classList.remove('active');
+            cameraView.classList.remove('active');
+            view.classList.add('active');
+        }
+
+        // Función para renderizar la lista de carpetas
+        function renderFolders() {
+            // Limpiar la lista
+            while (foldersList.children.length > 1) {
+                foldersList.removeChild(foldersList.lastChild);
+            }
+
+            if (foldersData.length === 0) {
+                noFoldersMessage.style.display = 'block';
+            } else {
+                noFoldersMessage.style.display = 'none';
+                foldersData.forEach((folder, index) => {
+                    const folderItem = document.createElement('div');
+                    folderItem.className = 'list-item';
+                    
+                    if (deleteMode) {
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.dataset.index = index;
+                        
+                        const label = document.createElement('label');
+                        label.textContent = folder.name;
+                        
+                        const checkboxContainer = document.createElement('div');
+                        checkboxContainer.className = 'checkbox-container';
+                        checkboxContainer.appendChild(checkbox);
+                        checkboxContainer.appendChild(label);
+                        
+                        folderItem.appendChild(checkboxContainer);
+                    } else {
+                        folderItem.textContent = folder.name;
+                        folderItem.addEventListener('click', () => openFolder(index));
+                    }
+                    
+                    foldersList.appendChild(folderItem);
+                });
+            }
+        }
+
+        // Función para renderizar la lista de códigos
+        function renderCodes() {
+            // Limpiar la tabla
+            while (codesList.children.length > 1) {
+                codesList.removeChild(codesList.lastChild);
+            }
+
+            if (!currentFolder || currentFolder.codes.length === 0) {
+                noCodesRow.style.display = 'table-row';
+            } else {
+                noCodesRow.style.display = 'none';
+                currentFolder.codes.forEach((code, index) => {
+                    const row = document.createElement('tr');
+                    
+                    if (deleteMode) {
+                        const checkCell = document.createElement('td');
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.dataset.index = index;
+                        checkCell.appendChild(checkbox);
+                        
+                        const codeCell = document.createElement('td');
+                        codeCell.textContent = code.value;
+                        
+                        const routeCell = document.createElement('td');
+                        routeCell.textContent = code.route;
+                        
+                        row.appendChild(checkCell);
+                        row.appendChild(codeCell);
+                        row.appendChild(routeCell);
+                    } else {
+                        const codeCell = document.createElement('td');
+                        codeCell.textContent = code.value;
+                        
+                        const routeCell = document.createElement('td');
+                        routeCell.textContent = code.route;
+                        
+                        row.appendChild(codeCell);
+                        row.appendChild(routeCell);
+                    }
+                    
+                    codesList.appendChild(row);
+                });
+            }
+        }
+
+        // Función para abrir una carpeta
+        function openFolder(index) {
+            currentFolder = foldersData[index];
+            folderNameElement.textContent = currentFolder.name;
+            renderCodes();
+            showView(codesView);
+        }
+
+        // Función para inicializar la cámara
+        async function initCamera() {
+            try {
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                }
+                
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
+                
+                video.srcObject = videoStream;
+                cameraError.style.display = 'none';
+                
+                // Configurar el canvas
+                canvas.width = video.clientWidth;
+                canvas.height = video.clientHeight;
+                
+                // Cargar el modelo COCO-SSD si aún no está cargado
+                if (!cocoModel) {
+                    try {
+                        cocoModel = await cocoSsd.load();
+                    } catch (err) {
+                        console.error('Error al cargar el modelo COCO-SSD:', err);
+                    }
+                }
+                
+                cameraActive = true;
+                recognizedCodes.clear();
+                detectCodes();
+                
+            } catch (error) {
+                console.error('Error al acceder a la cámara:', error);
+                cameraError.style.display = 'block';
+            }
+        }
+
+        // Función para detener la cámara
+        function stopCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            cameraActive = false;
+        }
+
+        // Función para detectar códigos en la transmisión de video
+        async function detectCodes() {
+            if (!cameraActive) return;
+            
+            const currentTime = Date.now();
+            if (currentTime - lastDetectionTime < detectionInterval) {
+                requestAnimationFrame(detectCodes);
+                return;
+            }
+            
+            lastDetectionTime = currentTime;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            try {
+                // Usar COCO-SSD para detectar objetos
+                if (cocoModel && video.readyState === 4) {
+                    const predictions = await cocoModel.detect(video);
+                    
+                    // Procesar cada predicción
+                    for (const prediction of predictions) {
+                        const [x, y, width, height] = prediction.bbox;
+                        
+                        // Recortar la región de interés
+                        const canvasTemp = document.createElement('canvas');
+                        const ctxTemp = canvasTemp.getContext('2d');
+                        canvasTemp.width = width;
+                        canvasTemp.height = height;
+                        ctxTemp.drawImage(video, x, y, width, height, 0, 0, width, height);
+                        
+                        // Usar Tesseract para reconocer texto en la región
+                        const imageData = canvasTemp.toDataURL('image/jpeg');
+                        const result = await Tesseract.recognize(
+                            imageData,
+                            'eng',
+                            { logger: m => console.log(m) }
+                        );
+                        
+                        const text = result.data.text.trim();
+                        if (text) {
+                            // Buscar si el texto contiene alguno de los códigos guardados
+                            let foundCode = null;
+                            let foundRoute = null;
+                            
+                            // Buscar en todas las carpetas
+                            for (const folder of foldersData) {
+                                for (const code of folder.codes) {
+                                    if (text.includes(code.value)) {
+                                        foundCode = code.value;
+                                        foundRoute = code.route;
+                                        break;
+                                    }
+                                }
+                                if (foundCode) break;
+                            }
+                            
+                            if (foundCode && foundRoute && !recognizedCodes.has(foundRoute)) {
+                                // Dibujar el rectángulo alrededor del código
+                                ctx.strokeStyle = '#3498db';
+                                ctx.lineWidth = 3;
+                                ctx.strokeRect(x, y, width, height);
+                                
+                                // Dibujar la etiqueta con la letra
+                                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                                ctx.fillRect(x, y - 30, 30, 30);
+                                ctx.fillStyle = 'white';
+                                ctx.font = 'bold 20px Arial';
+                                ctx.fillText(foundRoute, x + 8, y - 8);
+                                
+                                // Marcar como reconocido
+                                recognizedCodes.add(foundRoute);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error en la detección de códigos:', error);
+            }
+            
+            requestAnimationFrame(detectCodes);
+        }
+
+        // Event listeners
+        window.addEventListener('DOMContentLoaded', () => {
+            renderFolders();
+            
+            // Botones de navegación
+            foldersBtn.addEventListener('click', () => {
+                stopCamera();
+                showView(foldersView);
+            });
+            
+            cameraBtn.addEventListener('click', () => {
+                showView(cameraView);
+                initCamera();
+            });
+            
+            backToFoldersBtn.addEventListener('click', () => {
+                currentFolder = null;
+                deleteMode = false;
+                deleteCodeMode.style.display = 'none';
+                showView(foldersView);
+            });
+            
+            backToMainBtn.addEventListener('click', () => {
+                stopCamera();
+                showView(foldersView);
+            });
+            
+            // Botones de agregar carpeta
+            addFolderBtn.addEventListener('click', () => {
+                folderInput.value = '';
+                addFolderModal.style.display = 'flex';
+            });
+            
+            cancelAddFolderBtn.addEventListener('click', () => {
+                addFolderModal.style.display = 'none';
+            });
+            
+            addFolderForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const folderName = folderInput.value.trim();
+                if (folderName) {
+                    foldersData.push({
+                        name: folderName,
+                        codes: []
+                    });
+                    saveData();
+                    renderFolders();
+                    addFolderModal.style.display = 'none';
+                }
+            });
+            
+            // Botones de eliminar carpeta
+            deleteFolderBtn.addEventListener('click', () => {
+                deleteMode = !deleteMode;
+                if (deleteMode) {
+                    deleteFolderMode.style.display = 'block';
+                } else {
+                    deleteFolderMode.style.display = 'none';
+                }
+                renderFolders();
+            });
+            
+            confirmDeleteFoldersBtn.addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('#folders-list input[type="checkbox"]:checked');
+                const indicesToRemove = Array.from(checkboxes).map(checkbox => parseInt(checkbox.dataset.index));
+                
+                // Eliminar carpetas en orden descendente para evitar problemas con los índices
+                indicesToRemove.sort((a, b) => b - a).forEach(index => {
+                    foldersData.splice(index, 1);
+                });
+                
+                saveData();
+                deleteMode = false;
+                deleteFolderMode.style.display = 'none';
+                renderFolders();
+            });
+            
+            cancelDeleteFoldersBtn.addEventListener('click', () => {
+                deleteMode = false;
+                deleteFolderMode.style.display = 'none';
+                renderFolders();
+            });
+            
+            // Botones de agregar código
+            addCodeBtn.addEventListener('click', () => {
+                codeInput.value = '';
+                routeInput.value = '';
+                addCodeModal.style.display = 'flex';
+            });
+            
+            cancelAddCodeBtn.addEventListener('click', () => {
+                addCodeModal.style.display = 'none';
+            });
+            
+            addCodeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const codeValue = codeInput.value.trim();
+                const routeValue = routeInput.value.trim().toUpperCase();
+                
+                if (codeValue && routeValue) {
+                    // Verificar si la ruta ya existe en cualquier carpeta
+                    let routeExists = false;
+                    for (const folder of foldersData) {
+                        for (const code of folder.codes) {
+                            if (code.route === routeValue) {
+                                routeExists = true;
+                                break;
+                            }
+                        }
+                        if (routeExists) break;
+                    }
+                    
+                    if (routeExists) {
+                        alert('Esta ruta ya está asignada a otro código. Por favor elige una letra diferente.');
+                    } else {
+                        currentFolder.codes.push({
+                            value: codeValue,
+                            route: routeValue
+                        });
+                        saveData();
+                        renderCodes();
+                        addCodeModal.style.display = 'none';
+                    }
+                }
+            });
+            
+            // Botones de eliminar código
+            deleteCodeBtn.addEventListener('click', () => {
+                deleteMode = !deleteMode;
+                if (deleteMode) {
+                    deleteCodeMode.style.display = 'block';
+                    // Modificar la tabla para mostrar checkboxes
+                    const headerRow = document.querySelector('#codes-table thead tr');
+                    if (headerRow && headerRow.children.length === 2) {
+                        const checkHeader = document.createElement('th');
+                        checkHeader.textContent = 'Seleccionar';
+                        headerRow.insertBefore(checkHeader, headerRow.firstChild);
+                    }
+                } else {
+                    deleteCodeMode.style.display = 'none';
+                    // Restaurar la tabla
+                    const headerRow = document.querySelector('#codes-table thead tr');
+                    if (headerRow && headerRow.children.length === 3) {
+                        headerRow.removeChild(headerRow.firstChild);
+                    }
+                }
+                renderCodes();
+            });
+            
+            confirmDeleteCodesBtn.addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('#codes-list input[type="checkbox"]:checked');
+                const indicesToRemove = Array.from(checkboxes).map(checkbox => parseInt(checkbox.dataset.index));
+                
+                // Eliminar códigos en orden descendente para evitar problemas con los índices
+                indicesToRemove.sort((a, b) => b - a).forEach(index => {
+                    currentFolder.codes.splice(index, 1);
+                });
+                
+                saveData();
+                deleteMode = false;
+                deleteCodeMode.style.display = 'none';
+                // Restaurar la tabla
+                const headerRow = document.querySelector('#codes-table thead tr');
+                if (headerRow && headerRow.children.length === 3) {
+                    headerRow.removeChild(headerRow.firstChild);
+                }
+                renderCodes();
+            });
+            
+            cancelDeleteCodesBtn.addEventListener('click', () => {
+                deleteMode = false;
+                deleteCodeMode.style.display = 'none';
+                // Restaurar la tabla
+                const headerRow = document.querySelector('#codes-table thead tr');
+                if (headerRow && headerRow.children.length === 3) {
+                    headerRow.removeChild(headerRow.firstChild);
+                }
+                renderCodes();
+            });
+            
+            // Cerrar modales si se hace clic fuera de ellos
+            window.addEventListener('click', (e) => {
+                if (e.target === addFolderModal) {
+                    addFolderModal.style.display = 'none';
+                }
+                if (e.target === addCodeModal) {
+                    addCodeModal.style.display = 'none';
+                }
+            });
+            
+            // Ajustar el tamaño del canvas cuando cambia el tamaño de la ventana
+            window.addEventListener('resize', () => {
+                if (cameraActive) {
+                    canvas.width = video.clientWidth;
+                    canvas.height = video.clientHeight;
+                }
+            });
+        });
+
+        // Inicialización de bibliotecas de ML
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Cargar los modelos de ML en segundo plano
+            try {
+                // Inicializar Tesseract.js
+                await Tesseract.createWorker('eng');
+                console.log('Tesseract inicializado correctamente');
+            } catch (error) {
+                console.error('Error al inicializar Tesseract:', error);
+            }
+        });
+    </script>
+</body>
+</html>
